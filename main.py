@@ -4,11 +4,18 @@ An interpreter that implements a subset of lisp for floating point arithmetic.
 It has 3 stages:
 1. Lexer: Converts program text into a list of 'tokens'. Programs can have things such as spaces and blank lines, a lexer breaks a program into its significant components.
     Example: (+ 10 3) becomes ['(', '+', 10, 3, ')']
-2. Parser: Converts list of tokens into an Abstract Syntax Tree (AST). This is a structured tree type to represent the program.
+2. Parser: Converts list of tokens into an Abstract Syntax Tree (AST). Since lisp source code is a list, the AST is just a list of lists.
+    Example:
 3. Interpeter: Executes the AST, by recursively evaluating it.
 
 I avoid using more advanced Python like type hinting, enums, or the `match` statement for clarity.
 """
+
+
+"""Returns a list of tokens."""
+from functools import reduce
+from re import A
+
 
 def lexer(program):
     current_index = 0
@@ -44,4 +51,66 @@ def lexer(program):
 
     return tokens
 
-print(lexer("(+ (* 2 3 5) (+ 6 5 3 1))"))
+
+"""Parses tokens into an AST"""
+def parser(tokens):
+    # Since lisp programs are lists, all we need to do is skip the (, and place the elements into a list until we encounter the next )
+    # If we encounter a ( inside, we have another list, on which we can recurse
+    if tokens[0] != "(":
+        raise Exception(f"Syntax error: expected ( but found {tokens[0]}")
+
+    ast = []
+
+    current_index = 1 # since we accounted for the starting ( already
+
+    while current_index < len(tokens):
+        if tokens[current_index] == ")":
+            current_index += 1
+            return ast, current_index # second value tells us how many values to skip
+        if tokens[current_index] == "(":
+            inner, skip = parser(tokens[current_index:])
+            ast.append(inner)
+            current_index += skip
+        else:
+            ast.append(tokens[current_index])
+            current_index += 1
+
+    raise Exception("Syntax error: expected ) but found end of file")
+
+"""Executes an AST"""
+def interpret(ast):
+    # These are the functions/variables available to the program
+    # If we wanted to add function/variable definition to the language, it would just involve changing this dynamically
+
+    # lambda is just a compact way to define functions
+    variables = {
+        "+": lambda *args: sum(args),
+        "-": lambda *args: reduce(lambda a, b: a - b, args),
+        "*": lambda *args: reduce(lambda a, b: a * b, args),
+        "/": lambda *args: reduce(lambda a, b: a / b, args),
+    }
+
+    # in real lisp, the quote keyword prevents evaluation of lists
+    # we haven't implemented that here
+
+    function = ast[0] # the first item in the list is the function
+
+    args = []
+
+    for arg in ast[1:]:
+        if isinstance(arg, list):
+            # evaluate the sub-list
+            args.append(interpret(arg))
+        else:
+            args.append(arg)
+
+    return variables[function](*args)
+
+
+
+program = "(+ (* 2 3 5) (+ 6 5 3 1))"
+tokens = lexer(program)
+print("tokens:", tokens)
+ast = parser(tokens)[0]
+print("ast:", ast)
+print("result", interpret(ast))

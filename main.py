@@ -10,13 +10,10 @@ It has 3 stages:
 
 I avoid using more advanced Python like type hinting, enums, or the `match` statement for clarity.
 """
-
-
-"""Returns a list of tokens."""
 from functools import reduce
 
-
 def lexer(program):
+    """Returns a list of tokens."""
     current_index = 0
     tokens = []
 
@@ -51,8 +48,8 @@ def lexer(program):
     return tokens
 
 
-"""Parses tokens into an AST"""
 def parser(tokens):
+    """Parses tokens into an AST"""
     # Since lisp programs are lists, all we need to do is skip the (, and place the elements into a list until we encounter the next )
     # If we encounter a ( inside, we have another list, on which we can recurse
     if tokens[0] != "(":
@@ -76,8 +73,8 @@ def parser(tokens):
 
     raise Exception("Syntax error: expected ) but found end of file")
 
-"""Executes an AST"""
 def interpret(ast):
+    """Executes an AST"""
     # These are the functions/variables available to the program
     # If we wanted to add function/variable definition to the language, it would just involve changing this dynamically
 

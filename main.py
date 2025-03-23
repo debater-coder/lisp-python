@@ -14,7 +14,6 @@ I avoid using more advanced Python like type hinting, enums, or the `match` stat
 
 """Returns a list of tokens."""
 from functools import reduce
-from re import A
 
 
 def lexer(program):

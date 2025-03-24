@@ -94,8 +94,8 @@ def evaluate(ast, variables):
     # Default behaviour for function application evaluates each value first
     # Since foo isnt defined this wouldnt work
     if function == "define":
-        if len(args) != 2:
-            raise Exception("define takes 2 arguments")
+        if len(args) < 2:
+            raise Exception("define takes at least 2 arguments")
 
         if isinstance(args[0], list):
             # we are defining a function
@@ -103,14 +103,17 @@ def evaluate(ast, variables):
             # the first thing passed in has the function name and the rest are parameters
             parameters = args[0][1:]
             name = args[0][0]
-            body = args[1]
+            body = args[1:]
 
             def value(*args):
                 if len(args) != len(parameters):
                    raise Exception(f"{name} expects {len(parameters)} parameters but was passed {len(args)}.")
 
                 # evaluate with new parameters
-                return evaluate(body, variables | dict(zip(parameters, args)))  # the pipe operator adds the parameters to the scope of the function
+                out = None
+                for expr in body:
+                    out = evaluate(expr, variables | dict(zip(parameters, args)))  # the pipe operator adds the parameters to the scope of the function
+                return out
 
 
             variables[name] = value
@@ -138,6 +141,18 @@ def evaluate(ast, variables):
     return evaluate(function, variables)(*args)
 
 
+def execute(program, variables):
+    tokens = lexer(program)
+
+    index = 0
+    out = None
+
+    while index < len(tokens):
+        ast, skip = parser(tokens[index:])
+        out = evaluate(ast, variables)
+        index += skip
+
+    return out
 
 if __name__ == "__main__":
     variables = {
@@ -152,25 +167,22 @@ if __name__ == "__main__":
         "<=": lambda x, y: x <= y,
         "not": lambda x: not x,
         "and": lambda x, y: x and y,
-        "or": lambda x, y: x or y
+        "or": lambda x, y: x or y,
+        "print": print
     }
+
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+
+        with open(filename) as f:
+            content = f.read()
+        print(execute(content, variables))
+
+    print("REPL")
 
     while True:
         try:
             line = input("> ")
-            tokens = lexer(line)
-            ast = parser(tokens)[0]
-            print(evaluate(ast, variables))
+            print(execute(line, variables))
         except Exception as error:
             print(error, file=sys.stderr)
-
-
-"""
-Fibonacci function:
-
-(define (fib n)
-    (if (> n 0)
-        (* n (fib (- n 1)))
-        1
-))
-"""

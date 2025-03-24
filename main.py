@@ -48,7 +48,6 @@ def lexer(program):
 
     return tokens
 
-
 def parser(tokens):
     """Parses tokens into an AST"""
     # Since lisp programs are lists, all we need to do is skip the (, and place the elements into a list until we encounter the next )

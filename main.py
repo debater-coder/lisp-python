@@ -11,6 +11,7 @@ It has 3 stages:
 I avoid using more advanced Python like type hinting, enums, or the `match` statement for clarity.
 """
 from functools import reduce
+import sys
 
 def lexer(program):
     """Returns a list of tokens."""
@@ -40,7 +41,7 @@ def lexer(program):
             # if we wanted to add if statements or function definition we would make new keywords
             # This would only need changes at the interpreter level
             identifier = ""
-            while current_index < len(program) and not program[current_index].isspace():
+            while current_index < len(program) and not program[current_index].isspace() and not program[current_index] in ['(', ')']:
                 identifier += program[current_index]
                 current_index += 1
             tokens.append(identifier)
@@ -53,7 +54,7 @@ def parser(tokens):
     # Since lisp programs are lists, all we need to do is skip the (, and place the elements into a list until we encounter the next )
     # If we encounter a ( inside, we have another list, on which we can recurse
     if tokens[0] != "(":
-        raise Exception(f"Syntax error: expected ( but found {tokens[0]}")
+        return tokens[0], 1
 
     ast = []
 
@@ -63,22 +64,71 @@ def parser(tokens):
         if tokens[current_index] == ")":
             current_index += 1
             return ast, current_index # second value tells us how many values to skip
-        if tokens[current_index] == "(":
-            inner, skip = parser(tokens[current_index:])
-            ast.append(inner)
-            current_index += skip
-        else:
-            ast.append(tokens[current_index])
-            current_index += 1
+
+        inner, skip = parser(tokens[current_index:])
+        ast.append(inner)
+        current_index += skip
 
     raise Exception("Syntax error: expected ) but found end of file")
 
-def interpret(ast):
+def evaluate(ast, variables):
     """Executes an AST"""
     # These are the functions/variables available to the program
     # If we wanted to add function/variable definition to the language, it would just involve changing this dynamically
 
     # lambda is just a compact way to define functions
+
+    # in real lisp, the quote keyword prevents evaluation of lists
+    # we haven't implemented that here
+
+    if isinstance(ast, str):
+        try:
+            return variables[ast]
+        except KeyError:
+            raise Exception(f"{ast} is not defined")
+
+    if not isinstance(ast, list):
+        return ast
+
+
+    function = ast[0] # the first item in the list is the function
+    args = ast[1:]
+
+    if function == "define":
+        if len(args) != 2:
+            raise Exception("define takes 2 arguments")
+
+        if isinstance(args[0], list):
+            # we are defining a function
+            parameters = args[0][1:]
+            name = args[0][0]
+            body = args[1]
+
+            def value(*args):
+                if len(args) != len(parameters):
+                   raise Exception(f"{name} expects {len(parameters)} parameters but was passed {len(args)}.")
+
+                # evaluate with new parameters
+
+                return evaluate(body, variables | dict(zip(parameters, args)))
+
+
+            variables[name] = value
+        else:
+            # assigning a value
+            variables[args[0]] = evaluate(args[1], variables)
+
+        return
+
+    # function application
+    args = []
+    for arg in ast[1:]:
+        args.append(evaluate(arg, variables))
+    return evaluate(function, variables)(*args)
+
+
+
+if __name__ == "__main__":
     variables = {
         "+": lambda *args: sum(args),
         "-": lambda *args: reduce(lambda a, b: a - b, args),
@@ -86,27 +136,11 @@ def interpret(ast):
         "/": lambda *args: reduce(lambda a, b: a / b, args),
     }
 
-    # in real lisp, the quote keyword prevents evaluation of lists
-    # we haven't implemented that here
-
-    function = ast[0] # the first item in the list is the function
-
-    args = []
-
-    for arg in ast[1:]:
-        if isinstance(arg, list):
-            # evaluate the sub-list
-            args.append(interpret(arg))
-        else:
-            args.append(arg)
-
-    return variables[function](*args)
-
-
-
-program = "(+ (* 2 3 5) (+ 6 5 3 1))"
-tokens = lexer(program)
-print("tokens:", tokens)
-ast = parser(tokens)[0]
-print("ast:", ast)
-print("result", interpret(ast))
+    while True:
+        try:
+            line = input("> ")
+            tokens = lexer(line)
+            ast = parser(tokens)[0]
+            print(evaluate(ast, variables))
+        except Exception as error:
+            print(error, file=sys.stderr)

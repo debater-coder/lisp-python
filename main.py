@@ -70,11 +70,22 @@ def parser(tokens):
 
     raise Exception("Syntax error: expected ) but found end of file")
 
+
+def make_function(body, parameters, name=None):
+    def value(*args):
+        if len(args) != len(parameters):
+            raise Exception(f"{name or 'lambda expression'} expects {len(parameters)} parameters but was passed {len(args)}.")
+
+        # evaluate with new parameters
+        out = None
+        for expr in body:
+            out = evaluate(expr, variables | dict(zip(parameters, args)))  # the pipe operator adds the parameters to the scope of the function
+        return out
+
+    return value
+
 def evaluate(ast, variables):
     """Executes an AST"""
-    # in real lisp, the quote keyword prevents evaluation of lists
-    # we haven't implemented that here
-
     if isinstance(ast, str):
         try:
             return variables[ast]
@@ -87,6 +98,14 @@ def evaluate(ast, variables):
 
     function = ast[0] # the first item in the list is the function
     args = ast[1:]
+
+    if function == "quote":
+        return args[0]
+
+    if function == "lambda":
+        parameters = args[0]
+        expression = args[1]
+        return make_function([expression], parameters)
 
     # define is a special form that can't be implemented as a function
     # it is used like this: (define foo 1)
@@ -104,18 +123,7 @@ def evaluate(ast, variables):
             name = args[0][0]
             body = args[1:]
 
-            def value(*args):
-                if len(args) != len(parameters):
-                   raise Exception(f"{name} expects {len(parameters)} parameters but was passed {len(args)}.")
-
-                # evaluate with new parameters
-                out = None
-                for expr in body:
-                    out = evaluate(expr, variables | dict(zip(parameters, args)))  # the pipe operator adds the parameters to the scope of the function
-                return out
-
-
-            variables[name] = value
+            variables[name] = make_function(body, parameters, name)
         else:
             # assigning a value
             variables[args[0]] = evaluate(args[1], variables)
@@ -131,7 +139,6 @@ def evaluate(ast, variables):
         condition = evaluate(args[0], variables)
 
         return evaluate(args[1], variables) if condition else evaluate(args[2], variables)
-
 
     # function application
     args = []
@@ -167,7 +174,11 @@ if __name__ == "__main__":
         "not": lambda x: not x,
         "and": lambda x, y: x and y,
         "or": lambda x, y: x or y,
-        "print": print
+        "print": print,
+        "cons": lambda x, y: [x, *y] if isinstance(y, list) else [x, y],
+        "car": lambda x: x[0],
+        "cdr": lambda x: x[1:] if len(x) > 1 else [],
+        "null": []
     }
 
     if len(sys.argv) > 1:

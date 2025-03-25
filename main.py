@@ -178,7 +178,8 @@ if __name__ == "__main__":
         "cons": lambda x, y: [x, *y] if isinstance(y, list) else [x, y],
         "car": lambda x: x[0],
         "cdr": lambda x: x[1:] if len(x) > 1 else [],
-        "null": []
+        "null": [],
+        "//": lambda x, y: x // y
     }
 
     if len(sys.argv) > 1:
